@@ -1,0 +1,37 @@
+# Omacalc
+
+A dead-simple calculator built with Qt Quick and C++ that automatically follows the Omarchy theme and system dark/light mode.
+
+## Install
+
+Install via the Omarchy Package Repository via the `omacalc` package.
+
+## Usage
+
+The keypad covers the basics: the four arithmetic operators with the usual
+precedence (`×` and `÷` before `+` and `−`), decimals, percent, sign toggle,
+and backspace. The expression builds up above the display and stays visible
+with the result after `=`, so `42 × 3 + 7` reads back exactly as it was entered.
+
+Everything works from the keyboard too:
+
+- `0-9`, `.`, `+`, `-`, `*`, `/`, and `%` enter digits and operators.
+- `Enter` or `=` calculates.
+- `Backspace` deletes the last digit.
+- `Escape` clears.
+- `S` toggles the sign.
+- `Ctrl+C` copies the result.
+- `Ctrl+?` shows the keyboard shortcut reference.
+
+Colors follow the current Omarchy theme (`~/.local/state/omarchy/current/theme/colors.toml`)
+and re-tint live when the theme changes. Text follows the desktop text size —
+`omarchy display text size`, or GNOME's `text-scaling-factor`.
+
+## Requirements
+
+- Qt 6: `qt6-base`, `qt6-declarative`, `qt6-quickcontrols2`
+- `xdg-desktop-portal` and a portal backend
+
+The iA Writer Mono font is bundled under the SIL Open Font License 1.1; see
+`fonts/OFL.txt`. The font is copyright Information Architects Inc. and based on
+IBM Plex, copyright IBM Corp.
