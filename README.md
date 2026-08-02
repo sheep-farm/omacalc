@@ -2,6 +2,10 @@
 
 A dead-simple calculator built with Qt Quick and C++ that automatically follows the Omarchy theme and system dark/light mode.
 
+<img width="800" alt="Omacalc in dark mode" src="screenshots/omacalc-dark.png" />
+<img width="800" alt="Omacalc in light mode" src="screenshots/omacalc-light.png" />
+
+
 ## Install
 
 Install via the Omarchy Package Repository via the `omacalc` package.
