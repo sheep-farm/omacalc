@@ -2,7 +2,9 @@
 
 #include <QDBusConnection>
 #include <QDBusMessage>
-#include <QDBusReply>
+#include <QDBusPendingCall>
+#include <QDBusPendingCallWatcher>
+#include <QDBusPendingReply>
 #include <QDBusVariant>
 #include <QGuiApplication>
 #include <QStyleHints>
@@ -46,28 +48,6 @@ qreal sanitizedTextScale(const QVariant &value, bool *known) {
     return qBound(0.5, scale, 3.0);
 }
 
-// Ask the desktop portal for a single setting, returning an invalid variant
-// when the portal is missing or slow to answer; the short timeout keeps a
-// stalled portal from holding up the GUI thread.
-QVariant portalSetting(const QString &nameSpace, const QString &key) {
-    const QDBusConnection bus = QDBusConnection::sessionBus();
-    if (!bus.isConnected())
-        return {};
-
-    QDBusMessage request = QDBusMessage::createMethodCall(
-        QStringLiteral("org.freedesktop.portal.Desktop"),
-        QStringLiteral("/org/freedesktop/portal/desktop"),
-        QStringLiteral("org.freedesktop.portal.Settings"),
-        QStringLiteral("Read"));
-    request << nameSpace << key;
-
-    const QDBusReply<QDBusVariant> reply(bus.call(request, QDBus::Block, 150));
-    if (!reply.isValid())
-        return {};
-
-    return reply.value().variant();
-}
-
 bool gsettingsSchemeIsDark(const QVariant &value, bool *known) {
     const QString scheme = unwrapVariant(value).toString();
     if (scheme.contains(QStringLiteral("prefer-dark"))) {
@@ -84,8 +64,12 @@ bool gsettingsSchemeIsDark(const QVariant &value, bool *known) {
 }
 
 SystemTheme::SystemTheme(QObject *parent) : QObject(parent) {
-    m_darkMode = detectDarkMode();
-    m_textScale = detectTextScale();
+    // Start from what Qt already knows synchronously; the portal answers
+    // arrive asynchronously and refine these without ever blocking startup.
+    bool known = false;
+    const bool qtDark = qtDarkMode(&known);
+    if (known)
+        m_darkMode = qtDark;
 
     if (QGuiApplication::styleHints()) {
         connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
@@ -99,11 +83,67 @@ SystemTheme::SystemTheme(QObject *parent) : QObject(parent) {
         QStringLiteral("SettingChanged"),
         this,
         SLOT(handlePortalSettingChanged(QString,QString,QDBusVariant)));
+
+    requestPortalDarkMode();
+    requestPortalTextScale();
 }
 
 void SystemTheme::refresh() {
-    setDarkMode(detectDarkMode());
-    setTextScale(detectTextScale());
+    bool known = false;
+    const bool qtDark = qtDarkMode(&known);
+    if (known)
+        setDarkMode(qtDark);
+
+    requestPortalDarkMode();
+    requestPortalTextScale();
+}
+
+// Ask the desktop portal for a single setting without holding up the GUI
+// thread; the handler only runs when a valid answer comes back, so a missing
+// or stalled portal simply leaves the current state alone.
+void SystemTheme::requestPortalSetting(const QString &nameSpace, const QString &key,
+                                       std::function<void(const QVariant &)> handler) {
+    const QDBusConnection bus = QDBusConnection::sessionBus();
+    if (!bus.isConnected())
+        return;
+
+    QDBusMessage request = QDBusMessage::createMethodCall(
+        QStringLiteral("org.freedesktop.portal.Desktop"),
+        QStringLiteral("/org/freedesktop/portal/desktop"),
+        QStringLiteral("org.freedesktop.portal.Settings"),
+        QStringLiteral("Read"));
+    request << nameSpace << key;
+
+    auto *watcher = new QDBusPendingCallWatcher(bus.asyncCall(request), this);
+    connect(watcher, &QDBusPendingCallWatcher::finished, this,
+            [handler = std::move(handler)](QDBusPendingCallWatcher *finished) {
+        const QDBusPendingReply<QDBusVariant> reply(*finished);
+        finished->deleteLater();
+        if (reply.isValid())
+            handler(reply.value().variant());
+    });
+}
+
+void SystemTheme::requestPortalDarkMode() {
+    requestPortalSetting(QStringLiteral("org.freedesktop.appearance"),
+                         QStringLiteral("color-scheme"),
+                         [this](const QVariant &value) {
+        bool known = false;
+        const bool dark = colorSchemeIsDark(value, &known);
+        if (known)
+            setDarkMode(dark);
+    });
+}
+
+void SystemTheme::requestPortalTextScale() {
+    requestPortalSetting(QStringLiteral("org.gnome.desktop.interface"),
+                         QStringLiteral("text-scaling-factor"),
+                         [this](const QVariant &value) {
+        bool known = false;
+        const qreal scale = sanitizedTextScale(value, &known);
+        if (known)
+            setTextScale(scale);
+    });
 }
 
 void SystemTheme::handlePortalSettingChanged(const QString &nameSpace, const QString &key,
@@ -135,41 +175,6 @@ void SystemTheme::handlePortalSettingChanged(const QString &nameSpace, const QSt
         setDarkMode(dark);
     else
         refresh();
-}
-
-bool SystemTheme::detectDarkMode() const {
-    bool known = false;
-
-    const bool portalDark = portalDarkMode(&known);
-    if (known)
-        return portalDark;
-
-    const bool qtDark = qtDarkMode(&known);
-    if (known)
-        return qtDark;
-
-    return true;
-}
-
-bool SystemTheme::portalDarkMode(bool *known) const {
-    *known = false;
-
-    const QVariant scheme = portalSetting(QStringLiteral("org.freedesktop.appearance"),
-                                          QStringLiteral("color-scheme"));
-    if (!scheme.isValid())
-        return false;
-
-    return colorSchemeIsDark(scheme, known);
-}
-
-qreal SystemTheme::detectTextScale() const {
-    const QVariant factor = portalSetting(QStringLiteral("org.gnome.desktop.interface"),
-                                          QStringLiteral("text-scaling-factor"));
-    if (!factor.isValid())
-        return 1.0;
-
-    bool known = false;
-    return sanitizedTextScale(factor, &known);
 }
 
 bool SystemTheme::qtDarkMode(bool *known) const {

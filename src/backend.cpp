@@ -53,7 +53,7 @@ Backend::Backend(QObject *parent) : QObject(parent) {
 QString Backend::expression() const {
     if (m_errored || m_justEvaluated)
         return m_evaluatedExpression;
-    return m_tokens.join(QLatin1Char(' '));
+    return prettyExpression(m_tokens);
 }
 
 QString Backend::display() const {
@@ -63,7 +63,18 @@ QString Backend::display() const {
         return m_entry;
     if (m_justEvaluated)
         return m_result;
-    return currentValue();
+    return formatNumber(QLocale::c().toDouble(currentValue()));
+}
+
+// Operand tokens carry full round-trip precision when they come from a chained
+// result; present every number at display precision instead.
+QString Backend::prettyExpression(const QStringList &tokens) {
+    QStringList pretty;
+    pretty.reserve(tokens.size());
+    for (const QString &token : tokens)
+        pretty << (isOperator(token) ? token
+                                     : formatNumber(QLocale::c().toDouble(token)));
+    return pretty.join(QLatin1Char(' '));
 }
 
 // The number the calculator is "at" right now: the entry being typed, or the
@@ -117,11 +128,27 @@ void Backend::pressDigit(const QString &digit) {
         pressClear();
     }
 
-    if (m_entry == QStringLiteral("0"))
+    if (m_entry == QStringLiteral("0")) {
         m_entry = digit;
-    else if (m_entry == QStringLiteral("-0"))
+        return;
+    }
+    if (m_entry == QStringLiteral("-0")) {
         m_entry = QStringLiteral("-") + digit;
-    else if (m_entry.size() < 16)
+        return;
+    }
+
+    // Fifteen significant digits is what the display format preserves; letting
+    // the entry grow beyond that would silently round what was typed. The
+    // zero in a leading "0." is not significant, so it does not count.
+    int digits = 0;
+    for (const QChar character : m_entry) {
+        if (character.isDigit())
+            ++digits;
+    }
+    if (m_entry.startsWith(QStringLiteral("0."))
+            || m_entry.startsWith(QStringLiteral("-0.")))
+        --digits;
+    if (digits < 15)
         m_entry += digit;
 }
 
@@ -141,8 +168,13 @@ void Backend::pressOperator(const QString &pretty) {
     if (m_errored)
         return;
 
-    if (m_justEvaluated)
-        beginEditingAfterResult();
+    if (m_justEvaluated) {
+        // Chain from the exact result value, not its rounded display text, so
+        // 1 ÷ 3 = × 3 comes back as 1. Seventeen significant digits round-trip
+        // any double; the expression line re-rounds them for presentation.
+        m_tokens = QStringList(QString::number(m_resultValue, 'g', 17));
+        clearEvaluation();
+    }
 
     if (!m_entry.isEmpty()) {
         m_tokens << sealNumber(m_entry) << pretty;
@@ -168,12 +200,13 @@ void Backend::pressEquals() {
     if (finalTokens.isEmpty())
         return;
 
-    m_evaluatedExpression = finalTokens.join(QLatin1Char(' '));
+    m_evaluatedExpression = prettyExpression(finalTokens);
     bool ok = false;
     const double value = evaluateTokens(finalTokens, &ok);
     if (!ok) {
         m_errored = true;
     } else {
+        m_resultValue = value;
         m_result = formatNumber(value);
         m_justEvaluated = true;
     }
@@ -181,17 +214,35 @@ void Backend::pressEquals() {
     m_entry.clear();
 }
 
+// iOS-style percent: with a pending + or −, x% means x percent of the running
+// total, so 200 + 10 % = gives 220. With × or ÷ (or on its own) x% is simply
+// x ÷ 100, so 200 × 10 % = gives 20.
 void Backend::pressPercent() {
     if (m_errored)
         return;
-    if (m_justEvaluated)
-        beginEditingAfterResult();
+
+    if (m_justEvaluated) {
+        const double percent = m_resultValue / 100.0;
+        clearEvaluation();
+        m_entry = formatNumber(percent);
+        return;
+    }
 
     bool ok = false;
     const double value = QLocale::c().toDouble(currentValue(), &ok);
     if (!ok)
         return;
-    m_entry = formatNumber(value / 100.0);
+
+    double percent = value / 100.0;
+    if (!m_tokens.isEmpty() && (m_tokens.last() == plusSign || m_tokens.last() == minusSign)) {
+        QStringList leftSide = m_tokens;
+        leftSide.removeLast();
+        bool baseOk = false;
+        const double base = evaluateTokens(leftSide, &baseOk);
+        if (baseOk)
+            percent = base * value / 100.0;
+    }
+    m_entry = formatNumber(percent);
 }
 
 void Backend::pressToggleSign() {
@@ -200,8 +251,13 @@ void Backend::pressToggleSign() {
     if (m_justEvaluated)
         beginEditingAfterResult();
 
-    if (m_entry.isEmpty())
-        m_entry = currentValue();
+    // With nothing typed yet, start a fresh negative operand instead of
+    // dredging up the previous one: 4 + ± 2 enters -2, not -42.
+    if (m_entry.isEmpty()) {
+        m_entry = QStringLiteral("-0");
+        return;
+    }
+
     if (m_entry.startsWith(QLatin1Char('-')))
         m_entry.remove(0, 1);
     else
@@ -224,23 +280,31 @@ void Backend::pressBackspace() {
 void Backend::pressClear() {
     m_tokens.clear();
     m_entry.clear();
-    m_result.clear();
-    m_evaluatedExpression.clear();
-    m_justEvaluated = false;
+    clearEvaluation();
     m_errored = false;
 }
 
-// Editing after equals picks up from the result, with the old expression
-// cleared away so the new one grows from "42" rather than "42 × 3 + 7".
+// Editing after equals picks up from the result's displayed digits, with the
+// old expression cleared away so the new one grows from "42" rather than
+// "42 × 3 + 7".
 void Backend::beginEditingAfterResult() {
     m_entry = m_result;
     m_tokens.clear();
+    clearEvaluation();
+}
+
+void Backend::clearEvaluation() {
     m_result.clear();
+    m_resultValue = 0;
     m_evaluatedExpression.clear();
     m_justEvaluated = false;
 }
 
 double Backend::evaluateTokens(const QStringList &tokens, bool *ok) {
+    bool localOk = false;
+    if (!ok)
+        ok = &localOk;
+
     *ok = false;
     if (tokens.size() % 2 == 0)
         return 0;
@@ -290,11 +354,11 @@ QString Backend::formatNumber(double value) {
     if (value == 0)
         value = 0;  // Collapse negative zero.
 
-    // Thirteen significant digits keeps binary-float noise like
-    // 0.1 + 0.2 = 0.30000000000000004 out of the display while leaving
-    // room for serious arithmetic; very large and small magnitudes fall
-    // back to scientific notation.
-    return QString::number(value, 'g', 13);
+    // Fifteen significant digits keeps binary-float noise like
+    // 0.1 + 0.2 = 0.30000000000000004 out of the display while showing
+    // every integer the 15-digit entry limit can produce exactly; larger
+    // magnitudes fall back to scientific notation.
+    return QString::number(value, 'g', 15);
 }
 
 void Backend::copyResult() const {
@@ -306,10 +370,13 @@ QVariantMap Backend::windowGeometry() const {
     const QSettings settings;
     const QRect geometry = settings.value(windowGeometrySetting).toRect();
     QVariantMap map;
-    map.insert(QStringLiteral("x"), geometry.isValid() ? geometry.x() : -1);
-    map.insert(QStringLiteral("y"), geometry.isValid() ? geometry.y() : -1);
-    map.insert(QStringLiteral("width"), geometry.isValid() ? geometry.width() : 0);
-    map.insert(QStringLiteral("height"), geometry.isValid() ? geometry.height() : 0);
+    // Positions can legitimately be negative on monitors left of or above the
+    // primary, so validity travels separately instead of being encoded as -1.
+    map.insert(QStringLiteral("valid"), geometry.isValid());
+    map.insert(QStringLiteral("x"), geometry.x());
+    map.insert(QStringLiteral("y"), geometry.y());
+    map.insert(QStringLiteral("width"), geometry.width());
+    map.insert(QStringLiteral("height"), geometry.height());
     map.insert(QStringLiteral("maximized"),
                settings.value(QStringLiteral("window/maximized"), false).toBool());
     return map;

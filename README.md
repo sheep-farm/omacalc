@@ -16,6 +16,10 @@ precedence (`×` and `÷` before `+` and `−`), decimals, percent, sign toggle,
 and backspace. The expression builds up above the display and stays visible
 with the result after `=`, so `42 × 3 + 7` reads back exactly as it was entered.
 
+Percent follows the familiar calculator convention: with a pending `+` or `−`
+it takes that percentage of the running total (`200 + 10 % =` gives `220`),
+while with `×` or `÷` — or on its own — it simply divides by 100.
+
 Everything works from the keyboard too:
 
 - `0-9`, `.`, `+`, `-`, `*`, `/`, and `%` enter digits and operators.
@@ -32,7 +36,7 @@ and re-tint live when the theme changes. Text follows the desktop text size —
 
 ## Requirements
 
-- Qt 6: `qt6-base`, `qt6-declarative`, `qt6-quickcontrols2`
+- Qt 6: `qt6-base`, `qt6-declarative`
 - `xdg-desktop-portal` and a portal backend
 
 The iA Writer Mono font is bundled under the SIL Open Font License 1.1; see

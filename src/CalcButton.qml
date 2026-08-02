@@ -14,6 +14,21 @@ Rectangle {
 
     signal activated()
 
+    Accessible.role: Accessible.Button
+    Accessible.name: {
+        if (iconName === "backspace") return "Backspace";
+        if (label === "AC") return "All clear";
+        if (label === "±") return "Toggle sign";
+        if (label === "%") return "Percent";
+        if (label === "÷") return "Divide";
+        if (label === "×") return "Multiply";
+        if (label === "−") return "Subtract";
+        if (label === "+") return "Add";
+        if (label === "=") return "Equals";
+        return label;
+    }
+    Accessible.onPressAction: activated()
+
     function mixColors(base, tint, amount) {
         return Qt.rgba(
             base.r + (tint.r - base.r) * amount,

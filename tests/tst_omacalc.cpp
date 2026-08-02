@@ -74,18 +74,74 @@ private slots:
         QCOMPARE(calculator.display(), QStringLiteral("5"));
     }
 
-    void percentAndSign() {
+    void percentOfRunningTotal() {
         Backend calculator;
-        press(calculator, "5 0 %");
+
+        // With a pending + or −, x% means x percent of the running total.
+        press(calculator, "2 0 0 + 1 0 % =");
+        QCOMPARE(calculator.display(), QStringLiteral("220"));
+
+        press(calculator, "clear 2 0 0 - 1 0 % =");
+        QCOMPARE(calculator.display(), QStringLiteral("180"));
+
+        // With × or ÷, or standalone, x% is simply x ÷ 100.
+        press(calculator, "clear 2 0 0 × 1 0 % =");
+        QCOMPARE(calculator.display(), QStringLiteral("20"));
+
+        press(calculator, "clear 5 0 %");
         QCOMPARE(calculator.display(), QStringLiteral("0.5"));
 
-        press(calculator, "clear 8 sign");
+        // After equals, percent picks up from the result.
+        press(calculator, "clear 4 0 + 1 0 = %");
+        QCOMPARE(calculator.display(), QStringLiteral("0.5"));
+    }
+
+    void percentAndSign() {
+        Backend calculator;
+        press(calculator, "8 sign");
         QCOMPARE(calculator.display(), QStringLiteral("-8"));
         press(calculator, "sign");
         QCOMPARE(calculator.display(), QStringLiteral("8"));
 
         press(calculator, "clear 4 + 8 sign =");
         QCOMPARE(calculator.display(), QStringLiteral("-4"));
+    }
+
+    void signStartsNewOperand() {
+        Backend calculator;
+
+        // Sign with nothing typed starts a fresh negative operand rather than
+        // negating the previous one: 4 + ± 2 = is 4 + (-2), not 4 + (-42).
+        press(calculator, "4 + sign 2 =");
+        QCOMPARE(calculator.display(), QStringLiteral("2"));
+        QCOMPARE(calculator.expression(), QStringLiteral("4 + -2"));
+
+        press(calculator, "clear sign");
+        QCOMPARE(calculator.display(), QStringLiteral("-0"));
+        press(calculator, "5");
+        QCOMPARE(calculator.display(), QStringLiteral("-5"));
+    }
+
+    void chainsWithFullPrecision() {
+        Backend calculator;
+
+        // Chaining continues from the exact value, not the rounded display.
+        press(calculator, "1 ÷ 3 = × 3 =");
+        QCOMPARE(calculator.display(), QStringLiteral("1"));
+
+        // Integers within the 15-digit entry limit survive exactly.
+        press(calculator, "clear 9 9 9 9 9 9 9 9 9 9 9 9 9 9 =");
+        QCOMPARE(calculator.display(), QStringLiteral("99999999999999"));
+    }
+
+    void capsEntryAtFifteenDigits() {
+        Backend calculator;
+        press(calculator, "1 2 3 4 5 6 7 8 9 1 2 3 4 5 6 7 8");
+        QCOMPARE(calculator.display(), QStringLiteral("123456789123456"));
+
+        // The decimal point does not count against the digit cap.
+        press(calculator, "clear . 1 2 3 4 5 6 7 8 9 1 2 3 4 5 6 7");
+        QCOMPARE(calculator.display(), QStringLiteral("0.123456789123456"));
     }
 
     void backspaceEdits() {

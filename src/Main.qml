@@ -18,8 +18,24 @@ ApplicationWindow {
     readonly property color inkColor: backend.themeForeground
     // Every hardcoded size in the interface is expressed at the 400 × 620
     // design size; resizing the window scales the whole face with it. The
-    // desktop text scale is folded into the default window size below.
+    // desktop text scale is folded into the default window size below, and
+    // runtime changes resize the window proportionally so the face re-flows
+    // live along with the rest of the desktop.
     readonly property real uiScale: Math.min(width / 400, height / 620)
+    property real appliedTextScale: backend.textScale
+
+    Connections {
+        target: backend
+
+        function onTextScaleChanged() {
+            var factor = backend.textScale / win.appliedTextScale;
+            win.appliedTextScale = backend.textScale;
+            if (win.visibility === Window.Windowed) {
+                win.width = Math.round(win.width * factor);
+                win.height = Math.round(win.height * factor);
+            }
+        }
+    }
 
     function mixColors(base, tint, amount) {
         return Qt.rgba(
@@ -246,11 +262,35 @@ ApplicationWindow {
         }
     }
 
+    // Remember the last windowed geometry rather than whatever the window
+    // happens to measure at teardown: a maximized window reports screen-sized
+    // dimensions, and the close sequence hides the window before destruction,
+    // so neither the live geometry nor the final visibility can be trusted.
+    property rect normalGeometry: Qt.rect(x, y, width, height)
+    property bool wasMaximized: false
+
+    function trackNormalGeometry() {
+        if (visibility === Window.Windowed)
+            normalGeometry = Qt.rect(x, y, width, height);
+    }
+
+    onXChanged: trackNormalGeometry()
+    onYChanged: trackNormalGeometry()
+    onWidthChanged: trackNormalGeometry()
+    onHeightChanged: trackNormalGeometry()
+
+    onVisibilityChanged: {
+        if (visibility === Window.Maximized || visibility === Window.FullScreen)
+            wasMaximized = true;
+        else if (visibility === Window.Windowed)
+            wasMaximized = false;
+    }
+
     Component.onCompleted: {
         var geometry = backend.windowGeometry();
-        if (geometry.width > 0 && geometry.height > 0) {
-            if (geometry.x >= 0) x = geometry.x;
-            if (geometry.y >= 0) y = geometry.y;
+        if (geometry.valid) {
+            x = geometry.x;
+            y = geometry.y;
             width = geometry.width;
             height = geometry.height;
             if (geometry.maximized) showMaximized();
@@ -261,5 +301,7 @@ ApplicationWindow {
         }
     }
 
-    Component.onDestruction: backend.saveWindowGeometry(x, y, width, height, visibility === Window.Maximized)
+    Component.onDestruction: backend.saveWindowGeometry(
+        normalGeometry.x, normalGeometry.y,
+        normalGeometry.width, normalGeometry.height, wasMaximized)
 }

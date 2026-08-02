@@ -58,12 +58,15 @@ private:
 
     QString currentValue() const;
     void beginEditingAfterResult();
+    void clearEvaluation();
+    static QString prettyExpression(const QStringList &tokens);
     void loadOmarchyTheme();
     void watchOmarchyTheme();
 
     QStringList m_tokens;
     QString m_entry;
     QString m_result;
+    double m_resultValue = 0;
     QString m_evaluatedExpression;
     bool m_justEvaluated = false;
     bool m_errored = false;
