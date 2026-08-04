@@ -25,10 +25,10 @@ Everything works from the keyboard too:
 - `0-9`, `.`, `+`, `-`, `*`, `/`, and `%` enter digits and operators.
 - `Enter` or `=` calculates.
 - `Backspace` deletes the last digit.
-- `Escape` clears.
+- `C` or `Escape` clears.
 - `S` toggles the sign.
-- `Ctrl+C` copies the result.
-- `Ctrl+?` shows the keyboard shortcut reference.
+- `Ctrl+C` or `Super+C` copies the result.
+- `Ctrl+V` or `Super+V` pastes a number.
 
 Colors follow the current Omarchy theme (`~/.local/state/omarchy/current/theme/colors.toml`)
 and re-tint live when the theme changes. Text follows the desktop text size —

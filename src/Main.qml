@@ -54,33 +54,21 @@ ApplicationWindow {
     color: pageColor
 
     Shortcut {
-        sequence: "Ctrl+C"
+        sequences: ["Ctrl+C", "Meta+C"]
         context: Qt.ApplicationShortcut
         onActivated: backend.copyResult()
     }
 
     Shortcut {
-        sequence: "Ctrl+?"
+        sequences: ["Ctrl+V", "Meta+V"]
         context: Qt.ApplicationShortcut
-        onActivated: shortcutsDialog.open()
+        onActivated: backend.pasteNumber()
     }
 
     Shortcut {
         sequence: "Ctrl+Q"
         context: Qt.ApplicationShortcut
         onActivated: win.close()
-    }
-
-    Dialog {
-        id: shortcutsDialog
-        modal: true
-        title: "Keyboard shortcuts"
-        standardButtons: Dialog.Close
-        anchors.centerIn: parent
-        contentItem: Label {
-            text: "0-9 . + - * / %  Enter digits and operators\nEnter or =  Calculate\nBackspace  Delete last digit\nEscape  Clear\nS  Toggle sign\nCtrl+C  Copy result\nCtrl+?  Shortcuts"
-            lineHeight: 1.5
-        }
     }
 
     Item {
@@ -104,6 +92,8 @@ ApplicationWindow {
                 backend.pressKey(".");
             } else if (event.text === "s" || event.text === "S") {
                 backend.pressKey("sign");
+            } else if (event.text === "c" || event.text === "C") {
+                backend.pressKey("clear");
             } else if (/^[0-9+\-*/%]$/.test(event.text)) {
                 backend.pressKey(event.text);
             } else {
@@ -112,66 +102,13 @@ ApplicationWindow {
             event.accepted = true;
         }
 
-        // The menu icon from the design: three right-aligned strokes.
-        Item {
-            id: menuButton
-            anchors.top: parent.top
-            anchors.right: parent.right
-            anchors.topMargin: win.scaledSize(6)
-            anchors.rightMargin: win.scaledSize(6)
-            width: win.scaledSize(24)
-            height: win.scaledSize(18)
-
-            Repeater {
-                model: [
-                    { y: 0.0, length: 1.0 },
-                    { y: 0.5, length: 0.66 },
-                    { y: 1.0, length: 1.0 }
-                ]
-
-                Rectangle {
-                    anchors.right: parent.right
-                    y: Math.round(modelData.y * (menuButton.height - height))
-                    width: Math.round(menuButton.width * modelData.length)
-                    height: Math.max(2, win.scaledSize(2))
-                    radius: height / 2
-                    color: menuHitArea.containsMouse ? win.inkColor : win.mutedColor
-                }
-            }
-
-            MouseArea {
-                id: menuHitArea
-                anchors.fill: parent
-                anchors.margins: -win.scaledSize(8)
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: appMenu.popup(menuButton,
-                                         menuButton.width - appMenu.width,
-                                         menuButton.height + win.scaledSize(8))
-            }
-
-            Menu {
-                id: appMenu
-                onClosed: face.forceActiveFocus()
-
-                MenuItem {
-                    text: "Copy Result"
-                    onTriggered: backend.copyResult()
-                }
-
-                MenuItem {
-                    text: "Keyboard Shortcuts"
-                    onTriggered: shortcutsDialog.open()
-                }
-            }
-        }
-
         Item {
             id: displayArea
-            anchors.top: menuButton.bottom
+            anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: divider.top
+            anchors.topMargin: win.scaledSize(24)
             anchors.leftMargin: win.scaledSize(8)
             anchors.rightMargin: win.scaledSize(8)
             anchors.bottomMargin: win.scaledSize(24)

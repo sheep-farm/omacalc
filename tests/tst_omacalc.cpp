@@ -1,4 +1,6 @@
 #include <QtTest>
+#include <QClipboard>
+#include <QGuiApplication>
 
 #include "backend.h"
 
@@ -173,6 +175,28 @@ private slots:
         // Equals with a trailing operator drops it.
         press(calculator, "clear 9 + =");
         QCOMPARE(calculator.display(), QStringLiteral("9"));
+    }
+
+    void pastesNumbers() {
+        Backend calculator;
+        QClipboard *clipboard = QGuiApplication::clipboard();
+
+        clipboard->setText(QStringLiteral(" 42.5 "));
+        calculator.pasteNumber();
+        QCOMPARE(calculator.display(), QStringLiteral("42.5"));
+
+        // A pasted number is a normal entry that calculates like any other.
+        press(calculator, "+ . 5 =");
+        QCOMPARE(calculator.display(), QStringLiteral("43"));
+
+        // Decimal commas are welcome; garbage is ignored.
+        clipboard->setText(QStringLiteral("1,5"));
+        calculator.pasteNumber();
+        QCOMPARE(calculator.display(), QStringLiteral("1.5"));
+
+        clipboard->setText(QStringLiteral("not a number"));
+        calculator.pasteNumber();
+        QCOMPARE(calculator.display(), QStringLiteral("1.5"));
     }
 
     void evaluatesTokens() {

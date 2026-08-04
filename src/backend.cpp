@@ -366,6 +366,33 @@ void Backend::copyResult() const {
         clipboard->setText(display());
 }
 
+// Paste replaces the current entry when the clipboard holds a number,
+// tolerating surrounding whitespace, a decimal comma, and the typographic
+// minus this calculator itself puts in expressions.
+void Backend::pasteNumber() {
+    const QClipboard *clipboard = QGuiApplication::clipboard();
+    if (!clipboard)
+        return;
+
+    QString text = clipboard->text().trimmed();
+    text.replace(minusSign, QStringLiteral("-"));
+    text.remove(QLatin1Char(' '));
+
+    bool ok = false;
+    double value = QLocale::c().toDouble(text, &ok);
+    if (!ok) {
+        text.replace(QLatin1Char(','), QLatin1Char('.'));
+        value = QLocale::c().toDouble(text, &ok);
+    }
+    if (!ok || !std::isfinite(value))
+        return;
+
+    if (m_errored || m_justEvaluated)
+        pressClear();
+    m_entry = formatNumber(value);
+    emit calculationChanged();
+}
+
 QVariantMap Backend::windowGeometry() const {
     const QSettings settings;
     const QRect geometry = settings.value(windowGeometrySetting).toRect();
