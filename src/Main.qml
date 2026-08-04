@@ -7,21 +7,21 @@ import QtQuick.Window
 ApplicationWindow {
     id: win
     width: 400
-    height: 620
+    height: 596
     minimumWidth: 300
-    minimumHeight: 470
+    minimumHeight: 450
     visible: true
     title: "Omacalc"
 
     readonly property bool darkMode: backend.darkMode
     readonly property color pageColor: backend.themeBackground
     readonly property color inkColor: backend.themeForeground
-    // Every hardcoded size in the interface is expressed at the 400 × 620
+    // Every hardcoded size in the interface is expressed at the 400 × 596
     // design size; resizing the window scales the whole face with it. The
     // desktop text scale is folded into the default window size below, and
     // runtime changes resize the window proportionally so the face re-flows
     // live along with the rest of the desktop.
-    readonly property real uiScale: Math.min(width / 400, height / 620)
+    readonly property real uiScale: Math.min(width / 400, height / 596)
     property real appliedTextScale: backend.textScale
 
     Connections {
@@ -108,7 +108,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: divider.top
-            anchors.topMargin: win.scaledSize(24)
+            anchors.topMargin: win.scaledSize(12)
             anchors.leftMargin: win.scaledSize(8)
             anchors.rightMargin: win.scaledSize(8)
             anchors.bottomMargin: win.scaledSize(24)
@@ -155,7 +155,7 @@ ApplicationWindow {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            height: Math.round(parent.height * 0.62)
+            height: Math.round(parent.height * 0.65)
             columns: 4
             rowSpacing: win.scaledSize(12)
             columnSpacing: win.scaledSize(12)
@@ -234,7 +234,7 @@ ApplicationWindow {
         } else {
             // First run: open at the design size, grown by the desktop text scale.
             width = Math.round(400 * backend.textScale);
-            height = Math.round(620 * backend.textScale);
+            height = Math.round(596 * backend.textScale);
         }
     }
 
