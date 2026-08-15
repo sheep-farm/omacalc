@@ -10,6 +10,7 @@ class Backend : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString expression READ expression NOTIFY calculationChanged)
     Q_PROPERTY(QString display READ display NOTIFY calculationChanged)
+    Q_PROPERTY(QString decimalSeparator READ decimalSeparator CONSTANT)
     Q_PROPERTY(bool darkMode READ darkMode WRITE setDarkMode NOTIFY darkModeChanged)
     Q_PROPERTY(qreal textScale READ textScale WRITE setTextScale NOTIFY textScaleChanged)
     Q_PROPERTY(QString themeBackground READ themeBackground NOTIFY themeColorsChanged)
@@ -22,6 +23,7 @@ public:
 
     QString expression() const;
     QString display() const;
+    QString decimalSeparator() const { return m_decimalSeparator; }
 
     bool darkMode() const { return m_darkMode; }
     void setDarkMode(bool darkMode);
@@ -34,6 +36,8 @@ public:
 
     static double evaluateTokens(const QStringList &tokens, bool *ok);
     static QString formatNumber(double value);
+    QString formatResult(double value) const;
+    QString localizeNumber(const QString &number) const;
 
     Q_INVOKABLE void pressKey(const QString &key);
     Q_INVOKABLE void copyResult() const;
@@ -60,9 +64,10 @@ private:
     QString currentValue() const;
     void beginEditingAfterResult();
     void clearEvaluation();
-    static QString prettyExpression(const QStringList &tokens);
+    QString prettyExpression(const QStringList &tokens) const;
     void loadOmarchyTheme();
     void watchOmarchyTheme();
+    void loadDisplaySettings();
 
     QStringList m_tokens;
     QString m_entry;
@@ -74,6 +79,8 @@ private:
 
     bool m_darkMode = true;
     qreal m_textScale = 1.0;
+    QString m_decimalSeparator = QStringLiteral(".");
+    int m_fixedDecimalPlaces = -1;
     QString m_themeBackground;
     QString m_themeForeground;
     QString m_themeAccent;

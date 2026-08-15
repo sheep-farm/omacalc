@@ -218,6 +218,78 @@ private slots:
         QCOMPARE(Backend::formatNumber(1e15), QStringLiteral("1e+15"));
     }
 
+    void respectsDecimalSeparatorConfig() {
+        {
+            QSettings settings;
+            settings.setValue(QStringLiteral("display/decimalSeparator"), QStringLiteral("comma"));
+        }
+
+        Backend calculator;
+        QCOMPARE(calculator.decimalSeparator(), QStringLiteral(","));
+
+        press(calculator, "1 . 5 + 1 . 5 =");
+        QCOMPARE(calculator.display(), QStringLiteral("3"));
+
+        press(calculator, "clear 1 . 5 0 0");
+        QCOMPARE(calculator.display(), QStringLiteral("1,500"));
+
+        {
+            QSettings settings;
+            settings.remove(QStringLiteral("display/decimalSeparator"));
+        }
+    }
+
+    void respectsFixedDecimalPlacesConfig() {
+        {
+            QSettings settings;
+            settings.setValue(QStringLiteral("display/fixedDecimalPlaces"), 2);
+        }
+
+        Backend calculator;
+
+        // A float result is padded/rounded to the configured precision.
+        press(calculator, "1 0 ÷ 3 =");
+        QCOMPARE(calculator.display(), QStringLiteral("3.33"));
+
+        press(calculator, "clear 1 . 5 + 1 . 6 =");
+        QCOMPARE(calculator.display(), QStringLiteral("3.10"));
+
+        // Whole-number results stay plain integers regardless of the setting,
+        // even when the operands were typed with a decimal point.
+        press(calculator, "clear 1 . 5 + 1 . 5 =");
+        QCOMPARE(calculator.display(), QStringLiteral("3"));
+
+        press(calculator, "clear 4 + 6 =");
+        QCOMPARE(calculator.display(), QStringLiteral("10"));
+
+        // Chaining from a rounded result keeps the expression consistent with
+        // the display instead of revealing the full-precision value: the
+        // operand reads 3.33, not 3.33333333333333.
+        press(calculator, "clear 1 0 ÷ 3 = + 1 =");
+        QCOMPARE(calculator.expression(), QStringLiteral("3.33 + 1"));
+
+        {
+            QSettings settings;
+            settings.remove(QStringLiteral("display/fixedDecimalPlaces"));
+        }
+    }
+
+    void emptyFixedDecimalPlacesKeepsDefaultFormatting() {
+        {
+            QSettings settings;
+            settings.setValue(QStringLiteral("display/fixedDecimalPlaces"), QString());
+        }
+
+        Backend calculator;
+        press(calculator, "1 0 ÷ 3 =");
+        QCOMPARE(calculator.display(), Backend::formatNumber(10.0 / 3.0));
+
+        {
+            QSettings settings;
+            settings.remove(QStringLiteral("display/fixedDecimalPlaces"));
+        }
+    }
+
     void loadsCurrentOmarchyTheme() {
         QTemporaryDir homeDirectory;
         QVERIFY(homeDirectory.isValid());
