@@ -79,12 +79,19 @@ private slots:
     void percentOfRunningTotal() {
         Backend calculator;
 
-        // With a pending + or −, x% means x percent of the running total.
-        press(calculator, "2 0 0 + 1 0 % =");
+        // With a pending + or −, x% shows the running total with the percent
+        // applied, so 200 + 10 % immediately reads 220.
+        press(calculator, "2 0 0 + 1 0 %");
         QCOMPARE(calculator.display(), QStringLiteral("220"));
+        QCOMPARE(calculator.expression(), QStringLiteral("200 + 10%"));
 
-        press(calculator, "clear 2 0 0 - 1 0 % =");
+        press(calculator, "=");
+        QCOMPARE(calculator.display(), QStringLiteral("220"));
+        QCOMPARE(calculator.expression(), QStringLiteral("200 + 10%"));
+
+        press(calculator, "clear 2 0 0 - 1 0 %");
         QCOMPARE(calculator.display(), QStringLiteral("180"));
+        QCOMPARE(calculator.expression(), QStringLiteral("200 − 10%"));
 
         // With × or ÷, or standalone, x% is simply x ÷ 100.
         press(calculator, "clear 2 0 0 × 1 0 % =");
@@ -96,6 +103,20 @@ private slots:
         // After equals, percent picks up from the result.
         press(calculator, "clear 4 0 + 1 0 = %");
         QCOMPARE(calculator.display(), QStringLiteral("0.5"));
+    }
+
+    void percentAppliesToRunningTotal() {
+        Backend calculator;
+
+        // A digit after the percent starts a fresh calculation.
+        press(calculator, "2 0 0 + 1 0 % 5");
+        QCOMPARE(calculator.display(), QStringLiteral("5"));
+        QCOMPARE(calculator.expression(), QString());
+
+        // An operator after the percent chains from the applied total.
+        press(calculator, "clear 2 0 0 + 1 0 % × 2 =");
+        QCOMPARE(calculator.display(), QStringLiteral("440"));
+        QCOMPARE(calculator.expression(), QStringLiteral("220 × 2"));
     }
 
     void percentAndSign() {

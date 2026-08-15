@@ -233,16 +233,28 @@ void Backend::pressPercent() {
     if (!ok)
         return;
 
-    double percent = value / 100.0;
     if (!m_tokens.isEmpty() && (m_tokens.last() == plusSign || m_tokens.last() == minusSign)) {
         QStringList leftSide = m_tokens;
         leftSide.removeLast();
         bool baseOk = false;
         const double base = evaluateTokens(leftSide, &baseOk);
-        if (baseOk)
-            percent = base * value / 100.0;
+        if (baseOk) {
+            const double percent = base * value / 100.0;
+            const double total = (m_tokens.last() == plusSign) ? base + percent : base - percent;
+
+            // Show the running total with the percent already applied, and
+            // preserve the original expression so the user sees 200 + 10%.
+            m_evaluatedExpression = prettyExpression(m_tokens) + QLatin1Char(' ')
+                                    + formatNumber(value) + QLatin1Char('%');
+            m_resultValue = total;
+            m_result = formatNumber(total);
+            m_justEvaluated = true;
+            m_entry.clear();
+            m_tokens.clear();
+        }
+    } else {
+        m_entry = formatNumber(value / 100.0);
     }
-    m_entry = formatNumber(percent);
 }
 
 void Backend::pressToggleSign() {
