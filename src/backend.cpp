@@ -214,9 +214,9 @@ void Backend::pressEquals() {
     m_entry.clear();
 }
 
-// iOS-style percent: with a pending + or −, x% means x percent of the running
-// total, so 200 + 10 % = gives 220. With × or ÷ (or on its own) x% is simply
-// x ÷ 100, so 200 × 10 % = gives 20.
+// Percent always applies to the running total. With a pending operator,
+// 200 + 10% shows 220, 200 − 10% shows 180, 200 × 10% shows 20, and
+// 200 ÷ 10% shows 2000. On its own, x% is simply x ÷ 100.
 void Backend::pressPercent() {
     if (m_errored)
         return;
@@ -233,16 +233,41 @@ void Backend::pressPercent() {
     if (!ok)
         return;
 
-    double percent = value / 100.0;
-    if (!m_tokens.isEmpty() && (m_tokens.last() == plusSign || m_tokens.last() == minusSign)) {
+    if (!m_tokens.isEmpty() && isOperator(m_tokens.last())) {
         QStringList leftSide = m_tokens;
         leftSide.removeLast();
         bool baseOk = false;
         const double base = evaluateTokens(leftSide, &baseOk);
-        if (baseOk)
-            percent = base * value / 100.0;
+        if (baseOk) {
+            const QString &op = m_tokens.last();
+            const double fraction = value / 100.0;
+            double total = 0;
+
+            if (op == plusSign)
+                total = base + base * fraction;
+            else if (op == minusSign)
+                total = base - base * fraction;
+            else if (op == multiplySign)
+                total = base * fraction;
+            else if (op == divideSign)
+                total = base / fraction;
+
+            if (!std::isfinite(total))
+                return;
+
+            // Show the running total with the percent already applied, and
+            // preserve the original expression so the user sees 200 + 10%.
+            m_evaluatedExpression = prettyExpression(m_tokens) + QLatin1Char(' ')
+                                    + formatNumber(value) + QLatin1Char('%');
+            m_resultValue = total;
+            m_result = formatNumber(total);
+            m_justEvaluated = true;
+            m_entry.clear();
+            m_tokens.clear();
+        }
+    } else {
+        m_entry = formatNumber(value / 100.0);
     }
-    m_entry = formatNumber(percent);
 }
 
 void Backend::pressToggleSign() {
