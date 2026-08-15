@@ -38,6 +38,7 @@ QString sealNumber(const QString &entry) {
 }
 
 Backend::Backend(QObject *parent) : QObject(parent) {
+    loadDisplaySettings();
     loadOmarchyTheme();
     watchOmarchyTheme();
     connect(&m_themeWatcher, &QFileSystemWatcher::fileChanged, this, [this]() {
@@ -60,21 +61,45 @@ QString Backend::display() const {
     if (m_errored)
         return QStringLiteral("Error");
     if (!m_entry.isEmpty())
-        return m_entry;
+        return localizeNumber(m_entry);
     if (m_justEvaluated)
-        return m_result;
-    return formatNumber(QLocale::c().toDouble(currentValue()));
+        return localizeNumber(m_result);
+    return localizeNumber(formatResult(QLocale::c().toDouble(currentValue())));
 }
 
 // Operand tokens carry full round-trip precision when they come from a chained
-// result; present every number at display precision instead.
-QString Backend::prettyExpression(const QStringList &tokens) {
+// result; present every number at display precision instead. formatResult
+// applies the configured fixedDecimalPlaces, so an operand chained from a
+// rounded result (e.g. 5.67) doesn't reveal its full precision (5.66998476).
+QString Backend::prettyExpression(const QStringList &tokens) const {
     QStringList pretty;
     pretty.reserve(tokens.size());
     for (const QString &token : tokens)
         pretty << (isOperator(token) ? token
-                                     : formatNumber(QLocale::c().toDouble(token)));
+                                     : localizeNumber(formatResult(QLocale::c().toDouble(token))));
     return pretty.join(QLatin1Char(' '));
+}
+
+// Format a calculation result for display. Whole numbers are shown as plain
+// integers regardless of configuration. Non-integer results use the
+// configured fixed decimal places when set, so 10 ÷ 3 can show 3.33 instead
+// of Qt's shortest round-trip representation; otherwise formatNumber's
+// default significant-digit formatting applies.
+QString Backend::formatResult(double value) const {
+    double intPart = 0;
+    const bool isWholeNumber = std::isfinite(value) && std::modf(value, &intPart) == 0.0;
+    if (isWholeNumber || m_fixedDecimalPlaces < 0)
+        return formatNumber(value);
+    return QString::number(value, 'f', m_fixedDecimalPlaces);
+}
+
+// Present a C-locale number (always using '.') with the configured decimal
+// separator, so the internal math and parsing logic never has to change.
+QString Backend::localizeNumber(const QString &number) const {
+    if (m_decimalSeparator == QStringLiteral("."))
+        return number;
+    QString localized = number;
+    return localized.replace(QLatin1Char('.'), m_decimalSeparator);
 }
 
 // The number the calculator is "at" right now: the entry being typed, or the
@@ -207,7 +232,7 @@ void Backend::pressEquals() {
         m_errored = true;
     } else {
         m_resultValue = value;
-        m_result = formatNumber(value);
+        m_result = formatResult(value);
         m_justEvaluated = true;
     }
     m_tokens.clear();
@@ -521,6 +546,25 @@ void Backend::loadOmarchyTheme() {
     }
 
     emit themeColorsChanged();
+}
+
+// Read display preferences from ~/.config/Omacom/omacalc.conf. A bare ","
+// in an INI value is a list separator to Qt's parser, so also accept the
+// words "comma"/"dot" to spare users from having to quote it.
+void Backend::loadDisplaySettings() {
+    const QSettings settings;
+    const QString separator = settings.value(QStringLiteral("display/decimalSeparator"),
+                                              QStringLiteral(".")).toString().trimmed();
+    if (separator == QStringLiteral(",") || separator.compare(QStringLiteral("comma"), Qt::CaseInsensitive) == 0)
+        m_decimalSeparator = QStringLiteral(",");
+    else
+        m_decimalSeparator = QStringLiteral(".");
+
+    // fixedDecimalPlaces is optional; absent or negative disables it and
+    // results keep their natural precision.
+    bool ok = false;
+    const int places = settings.value(QStringLiteral("display/fixedDecimalPlaces"), -1).toInt(&ok);
+    m_fixedDecimalPlaces = (ok && places >= 0) ? std::min(places, 15) : -1;
 }
 
 void Backend::watchOmarchyTheme() {

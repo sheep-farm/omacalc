@@ -188,7 +188,7 @@ ApplicationWindow {
                 CalcButton {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    label: modelData.label
+                    label: modelData.key === "." ? backend.decimalSeparator : modelData.label
                     keyValue: modelData.key
                     kind: modelData.kind
                     iconName: modelData.icon === undefined ? "" : modelData.icon

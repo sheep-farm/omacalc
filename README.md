@@ -34,6 +34,28 @@ Colors follow the current Omarchy theme (`~/.local/state/omarchy/current/theme/c
 and re-tint live when the theme changes. Text follows the desktop text size —
 `omarchy display text size`, or GNOME's `text-scaling-factor`.
 
+## Configuration
+
+Omacalc reads display preferences from `~/.config/Omacom/omacalc.conf`:
+
+```ini
+[display]
+decimalSeparator=comma
+fixedDecimalPlaces=2
+```
+
+- `decimalSeparator` accepts `dot` (default) or `comma`, so numbers can be
+  typed and displayed with either an English or a Brazilian-style decimal
+  point. A quoted `","` also works, but Qt's INI parser treats a bare,
+  unquoted `,` as a list separator and silently drops it — use `comma` to
+  avoid that pitfall. All internal parsing and math stay locale-independent;
+  only the digits shown to the user and the decimal key label change.
+- `fixedDecimalPlaces` is optional. When set, any calculation result that
+  isn't a whole number is shown with exactly that many decimal places, e.g.
+  `fixedDecimalPlaces=2` turns `10 ÷ 3` into `3.33`. Whole-number results such
+  as `4 + 6` still show as `10`. Leave it unset to keep the default, shortest
+  round-trip formatting.
+
 ## Requirements
 
 - Qt 6: `qt6-base`, `qt6-declarative`
