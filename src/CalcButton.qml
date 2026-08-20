@@ -38,14 +38,19 @@ Rectangle {
 
     readonly property real restingLift: kind === "operator" ? 0.16 : 0.05
     readonly property real activeLift: restingLift
-        + (hitArea.pressed ? 0.09 : (hitArea.containsMouse ? 0.045 : 0))
+        + (hitArea.pressed ? 0.18 : (hitArea.containsMouse ? 0.045 : 0))
 
     radius: 0
     color: kind === "equals"
-        ? mixColors(inkColor, pageColor, hitArea.pressed ? 0.22 : (hitArea.containsMouse ? 0.1 : 0))
+        ? mixColors(inkColor, pageColor, hitArea.pressed ? 0.35 : (hitArea.containsMouse ? 0.1 : 0))
         : mixColors(pageColor, inkColor, activeLift)
     border.width: kind === "number" ? 1 : 0
     border.color: mixColors(pageColor, inkColor, 0.13)
+
+    scale: hitArea.pressed ? 0.97 : 1.0
+    transformOrigin: Item.Center
+    Behavior on color { ColorAnimation { duration: 80 } }
+    Behavior on scale { NumberAnimation { duration: 80; easing.type: Easing.OutQuad } }
 
     Text {
         anchors.centerIn: parent
