@@ -44,6 +44,13 @@ ApplicationWindow {
             base.b + (tint.b - base.b) * amount, 1);
     }
     readonly property color mutedColor: mixColors(pageColor, inkColor, 0.5)
+    property string activeKey: ""
+
+    function mapToButtonKey(text) {
+        if (text === "*") return "×";
+        if (text === "/") return "÷";
+        return text;
+    }
 
     function scaledSize(pixels) {
         return Math.max(1, Math.round(pixels * uiScale));
@@ -83,23 +90,34 @@ ApplicationWindow {
 
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter
                     || event.text === "=") {
+                win.activeKey = "=";
                 backend.pressKey("=");
             } else if (event.key === Qt.Key_Backspace) {
+                win.activeKey = "backspace";
                 backend.pressKey("backspace");
             } else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Delete) {
+                win.activeKey = "clear";
                 backend.pressKey("clear");
             } else if (event.text === "," || event.text === ".") {
+                win.activeKey = ".";
                 backend.pressKey(".");
             } else if (event.text === "s" || event.text === "S") {
+                win.activeKey = "sign";
                 backend.pressKey("sign");
             } else if (event.text === "c" || event.text === "C") {
+                win.activeKey = "clear";
                 backend.pressKey("clear");
             } else if (/^[0-9+\-*/%]$/.test(event.text)) {
+                win.activeKey = win.mapToButtonKey(event.text);
                 backend.pressKey(event.text);
             } else {
                 return;
             }
             event.accepted = true;
+        }
+
+        Keys.onReleased: function(event) {
+            win.activeKey = "";
         }
 
         Item {
@@ -194,6 +212,7 @@ ApplicationWindow {
                     iconName: modelData.icon === undefined ? "" : modelData.icon
                     pageColor: win.pageColor
                     inkColor: win.inkColor
+                    activeKey: win.activeKey
                     onActivated: backend.pressKey(keyValue)
                 }
             }
