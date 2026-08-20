@@ -40,7 +40,7 @@ Rectangle {
     readonly property real activeLift: restingLift
         + (hitArea.pressed ? 0.09 : (hitArea.containsMouse ? 0.045 : 0))
 
-    radius: Math.min(14, height * 0.18)
+    radius: 0
     color: kind === "equals"
         ? mixColors(inkColor, pageColor, hitArea.pressed ? 0.22 : (hitArea.containsMouse ? 0.1 : 0))
         : mixColors(pageColor, inkColor, activeLift)
