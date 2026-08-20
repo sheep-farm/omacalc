@@ -403,6 +403,11 @@ void Backend::pasteNumber() {
     text.replace(minusSign, QStringLiteral("-"));
     text.remove(QLatin1Char(' '));
 
+    // Copy hands out the configured separator, and the C locale reads a comma
+    // as a thousands group, so "1,500" would come back as 1500 rather than 1.5.
+    if (m_decimalSeparator != QStringLiteral("."))
+        text.replace(m_decimalSeparator, QStringLiteral("."));
+
     bool ok = false;
     double value = QLocale::c().toDouble(text, &ok);
     if (!ok) {

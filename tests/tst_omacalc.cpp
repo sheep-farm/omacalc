@@ -233,6 +233,13 @@ private slots:
         press(calculator, "clear 1 . 5 0 0");
         QCOMPARE(calculator.display(), QStringLiteral("1,500"));
 
+        // What the calculator copies, it has to be able to paste back: the C
+        // locale reads "1,500" as a thousands group and would return 1500.
+        calculator.copyResult();
+        press(calculator, "clear");
+        calculator.pasteNumber();
+        QCOMPARE(calculator.display(), QStringLiteral("1,5"));
+
         {
             QSettings settings;
             settings.remove(QStringLiteral("display/decimalSeparator"));
