@@ -16,9 +16,10 @@ precedence (`×` and `÷` before `+` and `−`), decimals, percent, sign toggle,
 and backspace. The expression builds up above the display and stays visible
 with the result after `=`, so `42 × 3 + 7` reads back exactly as it was entered.
 
-Percent applies to the running total: with a pending operator, `%` shows the
-result immediately (`200 + 10 %` gives `220`, `200 × 10 %` gives `20`,
-`200 ÷ 10 %` gives `2000`). On its own, `x %` simply divides by 100.
+Percent resolves against the pending operator and shows the result immediately:
+`+` and `−` take that percentage of the running total (`200 + 10 %` gives `220`),
+while `×` and `÷` take a plain fraction (`200 × 10 %` gives `20`, `200 ÷ 10 %`
+gives `2000`). On its own, `x %` simply divides by 100.
 
 Everything works from the keyboard too:
 

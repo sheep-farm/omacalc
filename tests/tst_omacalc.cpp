@@ -139,6 +139,37 @@ private slots:
         QCOMPARE(calculator.expression(), QStringLiteral("2000 × 2"));
     }
 
+    void percentKeepsPrecedence() {
+        Backend calculator;
+
+        // × and ÷ bind tighter than + and −, so the percent resolves against
+        // the operand beside it rather than the whole left-hand side.
+        press(calculator, "2 + 3 × 1 0 %");
+        QCOMPARE(calculator.display(), QStringLiteral("2.3"));
+
+        press(calculator, "clear 2 + 3 ÷ 1 0 %");
+        QCOMPARE(calculator.display(), QStringLiteral("32"));
+
+        press(calculator, "clear 1 0 + 2 × 3 %");
+        QCOMPARE(calculator.display(), QStringLiteral("10.06"));
+
+        // A pending + still takes its percentage of the running total.
+        press(calculator, "clear 2 × 3 + 1 0 %");
+        QCOMPARE(calculator.display(), QStringLiteral("6.6"));
+    }
+
+    void percentErrorsOnDivisionByZero() {
+        Backend calculator;
+
+        // Applying the percent divides by it, so a zero percent errors here
+        // rather than leaving the key silently dead.
+        press(calculator, "2 0 0 ÷ 0 %");
+        QCOMPARE(calculator.display(), QStringLiteral("Error"));
+
+        press(calculator, "clear 1 ÷ 0 + 5 %");
+        QCOMPARE(calculator.display(), QStringLiteral("Error"));
+    }
+
     void percentAndSign() {
         Backend calculator;
         press(calculator, "8 sign");

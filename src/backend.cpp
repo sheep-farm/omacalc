@@ -214,8 +214,8 @@ void Backend::pressEquals() {
     m_entry.clear();
 }
 
-// Percent always applies to the running total. With a pending operator,
-// 200 + 10% shows 220, 200 − 10% shows 180, 200 × 10% shows 20, and
+// Percent resolves against the pending operator and shows the result right
+// away: 200 + 10% shows 220, 200 − 10% shows 180, 200 × 10% shows 20, and
 // 200 ÷ 10% shows 2000. On its own, x% is simply x ÷ 100.
 void Backend::pressPercent() {
     if (m_errored)
@@ -234,36 +234,38 @@ void Backend::pressPercent() {
         return;
 
     if (!m_tokens.isEmpty() && isOperator(m_tokens.last())) {
-        QStringList leftSide = m_tokens;
-        leftSide.removeLast();
-        bool baseOk = false;
-        const double base = evaluateTokens(leftSide, &baseOk);
-        if (baseOk) {
-            const QString &op = m_tokens.last();
-            const double fraction = value / 100.0;
-            double total = 0;
+        // Resolve the percent into the operand the pending operator is waiting
+        // for, then evaluate the whole expression. Collapsing the left side
+        // into a single base instead would lose precedence, turning
+        // 2 + 3 × 10% into (2 + 3) × 0.1 rather than 2 + (3 × 0.1).
+        const QString op = m_tokens.last();
+        double operand = value / 100.0;
+        bool operandOk = true;
 
-            if (op == plusSign)
-                total = base + base * fraction;
-            else if (op == minusSign)
-                total = base - base * fraction;
-            else if (op == multiplySign)
-                total = base * fraction;
-            else if (op == divideSign)
-                total = base / fraction;
+        if (op == plusSign || op == minusSign) {
+            QStringList leftSide = m_tokens;
+            leftSide.removeLast();
+            const double base = evaluateTokens(leftSide, &operandOk);
+            operand = base * value / 100.0;
+        }
 
-            if (!std::isfinite(total))
-                return;
+        QStringList finalTokens = m_tokens;
+        finalTokens << QString::number(operand, 'g', 17);
+        bool totalOk = false;
+        const double total = evaluateTokens(finalTokens, &totalOk);
 
-            // Show the running total with the percent already applied, and
-            // preserve the original expression so the user sees 200 + 10%.
-            m_evaluatedExpression = prettyExpression(m_tokens) + QLatin1Char(' ')
-                                    + formatNumber(value) + QLatin1Char('%');
+        // Show the running total with the percent already applied, and
+        // preserve the original expression so the user sees 200 + 10%.
+        m_evaluatedExpression = prettyExpression(m_tokens) + QLatin1Char(' ')
+                                + formatNumber(value) + QLatin1Char('%');
+        m_entry.clear();
+        m_tokens.clear();
+        if (operandOk && totalOk) {
             m_resultValue = total;
             m_result = formatNumber(total);
             m_justEvaluated = true;
-            m_entry.clear();
-            m_tokens.clear();
+        } else {
+            m_errored = true;
         }
     } else {
         m_entry = formatNumber(value / 100.0);
